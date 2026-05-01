@@ -26,9 +26,3 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 80
-
-[userenv]
-
-[userenv.shared]
-DISCORD_GUILD_ID = "1132832953249046540"
-DISCORD_WELCOME_CHANNEL_ID = "1133816516752707584"
