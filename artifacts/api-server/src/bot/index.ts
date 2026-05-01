@@ -65,6 +65,7 @@ export function createBot(): Client {
       const embed = new EmbedBuilder()
         .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
         .setDescription(customMsg)
+        .setThumbnail(member.user.displayAvatarURL({ size: 256, extension: "png" }))
         .setImage("attachment://welcome.png")
         .setFooter({ text: `${member.guild.name} • ${new Date().toLocaleDateString()}` });
 
@@ -177,6 +178,7 @@ async function handleTestWelcome(message: Message) {
   const embed = new EmbedBuilder()
     .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
     .setDescription(`${customMsg}\n\n*This is a test preview.*`)
+    .setThumbnail(message.author.displayAvatarURL({ size: 256, extension: "png" }))
     .setImage("attachment://welcome.png")
     .setFooter({ text: `${message.guild!.name} • ${new Date().toLocaleDateString()}` });
 
