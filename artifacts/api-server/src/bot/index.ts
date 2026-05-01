@@ -94,6 +94,7 @@ export function createBot(): Client {
     switch (command) {
       case "setup":        return void handleSetup(message);
       case "testwelcome":  return void handleTestWelcome(message);
+      case "announce":     return void handleAnnounceInit(message, args);
       case "help":         return void handleHelp(message);
       case "kick":         return void handleKick(message, args);
       case "ban":     return void handleBan(message, args);
@@ -106,6 +107,32 @@ export function createBot(): Client {
   });
 
   return client;
+}
+
+// ── Announce ──────────────────────────────────────────────────────────────────
+
+async function handleAnnounceInit(message: Message, args: string[]) {
+  if (!message.member?.permissions.has(PermissionFlagsBits.ManageMessages)) {
+    await message.reply("You need **Manage Messages** permission to make announcements.");
+    return;
+  }
+
+  // Resolve target channel from mention or default to current channel
+  const mentionedChannel = message.mentions.channels.first();
+  const targetChannelId = mentionedChannel?.id ?? message.channel.id;
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`announce_build:${targetChannelId}`)
+      .setLabel("📢 Build Announcement")
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  const targetText = mentionedChannel ? `<#${targetChannelId}>` : "this channel";
+  await message.reply({
+    content: `Click below to compose your announcement for ${targetText}.`,
+    components: [row],
+  });
 }
 
 // ── Test welcome ──────────────────────────────────────────────────────────────
@@ -208,6 +235,67 @@ async function handleSetup(message: Message) {
 async function handleButton(interaction: ButtonInteraction) {
   if (!interaction.guild) return;
 
+  // ── Announce modal trigger ─────────────────────────────────────────────────
+  if (interaction.customId.startsWith("announce_build:")) {
+    const member = interaction.guild.members.cache.get(interaction.user.id);
+    if (!member?.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      await interaction.reply({ content: "You need **Manage Messages** permission.", ephemeral: true });
+      return;
+    }
+
+    const targetChannelId = interaction.customId.split(":")[1] ?? interaction.channelId;
+
+    const modal = new ModalBuilder()
+      .setCustomId(`modal_announce:${targetChannelId}`)
+      .setTitle("Build Announcement")
+      .addComponents(
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("ann_title")
+            .setLabel("Title")
+            .setPlaceholder("e.g. PICK THE ROLES U DESIRE")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+        ),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("ann_body")
+            .setLabel("Body (supports Discord markdown)")
+            .setPlaceholder("Use **bold**, *italic*, bullet points with - or •, etc.")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+        ),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("ann_gif")
+            .setLabel("GIF / Image URL (bottom of embed)")
+            .setPlaceholder("https://media.giphy.com/... or any image link")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+        ),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("ann_thumbnail")
+            .setLabel("Thumbnail URL (top-right corner, optional)")
+            .setPlaceholder("https://...")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+        ),
+        new ActionRowBuilder<TextInputBuilder>().addComponents(
+          new TextInputBuilder()
+            .setCustomId("ann_color")
+            .setLabel("Accent color (hex, optional)")
+            .setPlaceholder("#ED4245")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+        ),
+      );
+
+    await interaction.showModal(modal);
+    return;
+  }
+
+  // ── Setup buttons ──────────────────────────────────────────────────────────
   const member = interaction.guild.members.cache.get(interaction.user.id);
   if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
     await interaction.reply({ content: "You need **Manage Server** permission.", ephemeral: true });
@@ -284,6 +372,51 @@ async function handleModal(interaction: ModalSubmitInteraction) {
   if (!interaction.guild) return;
   const guildId = interaction.guild.id;
 
+  // ── Announce submit ──────────────────────────────────────────────────────────
+  if (interaction.customId.startsWith("modal_announce:")) {
+    const targetChannelId = interaction.customId.split(":")[1]!;
+    const channel = interaction.guild.channels.cache.get(targetChannelId) as TextChannel | undefined;
+
+    if (!channel?.isTextBased()) {
+      await interaction.reply({ content: "Target channel not found or not accessible.", ephemeral: true });
+      return;
+    }
+
+    const title       = interaction.fields.getTextInputValue("ann_title").trim();
+    const body        = interaction.fields.getTextInputValue("ann_body").trim();
+    const gifUrl      = interaction.fields.getTextInputValue("ann_gif").trim();
+    const thumbnail   = interaction.fields.getTextInputValue("ann_thumbnail").trim();
+    const colorInput  = interaction.fields.getTextInputValue("ann_color").trim();
+
+    const color = /^#[0-9A-Fa-f]{6}$/.test(colorInput)
+      ? (colorInput as `#${string}`)
+      : "#ED4245";
+
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(title)
+      .setDescription(body)
+      .setAuthor({
+        name: interaction.user.username,
+        iconURL: interaction.user.displayAvatarURL({ size: 64, extension: "png" }),
+      })
+      .setTimestamp();
+
+    if (gifUrl)    embed.setImage(gifUrl);
+    if (thumbnail) embed.setThumbnail(thumbnail);
+
+    await channel.send({ embeds: [embed] });
+
+    const targetText = targetChannelId === interaction.channelId
+      ? "here"
+      : `<#${targetChannelId}>`;
+
+    await interaction.reply({ content: `Announcement sent to ${targetText}! ✅`, ephemeral: true });
+    logger.info({ channel: targetChannelId, user: interaction.user.id }, "Announcement sent");
+    return;
+  }
+
+  // ── Setup modals ─────────────────────────────────────────────────────────────
   if (interaction.customId === "modal_channel") {
     const channelId = interaction.fields.getTextInputValue("channel_id").trim();
     const channel = interaction.guild.channels.cache.get(channelId);
@@ -331,6 +464,14 @@ async function handleHelp(message: Message) {
       {
         name: "⚙️ Setup",
         value: "`!setup` — Open the welcome customization panel",
+      },
+      {
+        name: "📢 Announcements",
+        value: [
+          "`!announce` — Build an announcement embed for the current channel",
+          "`!announce #channel` — Build and send to a specific channel",
+          "Supports GIFs, thumbnails, custom colors, and Discord markdown",
+        ].join("\n"),
       },
       {
         name: "🔨 Moderation",
