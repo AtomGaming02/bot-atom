@@ -88,9 +88,10 @@ export function createBot(): Client {
     const command = args.shift()?.toLowerCase();
 
     switch (command) {
-      case "setup":   return void handleSetup(message);
-      case "help":    return void handleHelp(message);
-      case "kick":    return void handleKick(message, args);
+      case "setup":        return void handleSetup(message);
+      case "testwelcome":  return void handleTestWelcome(message);
+      case "help":         return void handleHelp(message);
+      case "kick":         return void handleKick(message, args);
       case "ban":     return void handleBan(message, args);
       case "mute":    return void handleMute(message, args);
       case "unmute":  return void handleUnmute(message, args);
@@ -101,6 +102,50 @@ export function createBot(): Client {
   });
 
   return client;
+}
+
+// ── Test welcome ──────────────────────────────────────────────────────────────
+
+async function handleTestWelcome(message: Message) {
+  if (!message.member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    await message.reply("You need **Manage Server** permission to test the welcome.");
+    return;
+  }
+
+  const cfg = getGuildConfig(message.guild!.id);
+  const channelId = cfg.welcomeChannelId ?? process.env["DISCORD_WELCOME_CHANNEL_ID"] ?? "";
+
+  if (!channelId) {
+    await message.reply("No welcome channel set. Use `!setup` → **setup Channel** first.");
+    return;
+  }
+
+  const channel = message.guild!.channels.cache.get(channelId) as TextChannel | undefined;
+  if (!channel?.isTextBased()) {
+    await message.reply(`Could not find welcome channel <#${channelId}>. Make sure the bot has access to it.`);
+    return;
+  }
+
+  await message.reply(`Sending a test welcome to <#${channelId}>...`);
+
+  const card = await generateWelcomeCard({
+    username: message.author.username,
+    avatarUrl: message.author.displayAvatarURL({ size: 256, extension: "png" }),
+    serverName: message.guild!.name,
+    memberCount: message.guild!.memberCount,
+    backgroundUrl: cfg.backgroundUrl,
+    customMessage: cfg.welcomeMessage,
+    accentColor: cfg.embedColor,
+  });
+
+  const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
+  const embed = new EmbedBuilder()
+    .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
+    .setDescription(`Hey ${message.author}, welcome to **${message.guild!.name}**! 🎉\nUse \`!help\` to see available commands.\n\n*This is a test preview.*`)
+    .setImage("attachment://welcome.png")
+    .setFooter({ text: `${message.guild!.name} • ${new Date().toLocaleDateString()}` });
+
+  await channel.send({ embeds: [embed], files: [attachment] });
 }
 
 // ── Setup panel ──────────────────────────────────────────────────────────────
