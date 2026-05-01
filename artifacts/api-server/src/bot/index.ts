@@ -21,6 +21,16 @@ import { logger } from "../lib/logger";
 import { getGuildConfig, setGuildConfig } from "./config";
 import { generateWelcomeCard } from "./welcome-card";
 
+function isGifUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    return path.endsWith(".gif");
+  } catch {
+    return url.toLowerCase().includes(".gif");
+  }
+}
+
 export function createBot(): Client {
   const client = new Client({
     intents: [
@@ -47,29 +57,39 @@ export function createBot(): Client {
       const channel = member.guild.channels.cache.get(channelId) as TextChannel | undefined;
       if (!channel?.isTextBased()) return;
 
-      const card = await generateWelcomeCard({
-        username: member.user.username,
-        avatarUrl: member.user.displayAvatarURL({ size: 256, extension: "png" }),
-        memberCount: member.guild.memberCount,
-        backgroundUrl: cfg.backgroundUrl,
-        accentColor: cfg.embedColor,
-      });
-
+      const avatarUrl = member.user.displayAvatarURL({ size: 256, extension: "png" });
       const customMsg = cfg.welcomeMessage
         ? cfg.welcomeMessage
             .replace("{user}", `${member}`)
             .replace("{count}", String(member.guild.memberCount))
         : `Hey ${member}, welcome to **${member.guild.name}**! 🎉\nUse \`!help\` to see available commands.`;
 
-      const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
       const embed = new EmbedBuilder()
         .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
         .setDescription(customMsg)
-        .setThumbnail(member.user.displayAvatarURL({ size: 256, extension: "png" }))
-        .setImage("attachment://welcome.png")
+        .setThumbnail(avatarUrl)
         .setFooter({ text: `${member.guild.name} • ${new Date().toLocaleDateString()}` });
 
-      await channel.send({ embeds: [embed], files: [attachment] });
+      let files: AttachmentBuilder[] = [];
+
+      if (isGifUrl(cfg.backgroundUrl)) {
+        // GIF background — show it directly so it animates
+        embed.setImage(cfg.backgroundUrl!);
+      } else {
+        // Static background — render the welcome card
+        const card = await generateWelcomeCard({
+          username: member.user.username,
+          avatarUrl,
+          memberCount: member.guild.memberCount,
+          backgroundUrl: cfg.backgroundUrl,
+          accentColor: cfg.embedColor,
+        });
+        const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
+        files = [attachment];
+        embed.setImage("attachment://welcome.png");
+      }
+
+      await channel.send({ embeds: [embed], files });
       logger.info({ userId: member.user.id }, "Welcome card sent");
     } catch (err) {
       logger.error({ err }, "Failed to send welcome card");
@@ -160,29 +180,37 @@ async function handleTestWelcome(message: Message) {
 
   await message.reply(`Sending a test welcome to <#${channelId}>...`);
 
-  const card = await generateWelcomeCard({
-    username: message.author.username,
-    avatarUrl: message.author.displayAvatarURL({ size: 256, extension: "png" }),
-    memberCount: message.guild!.memberCount,
-    backgroundUrl: cfg.backgroundUrl,
-    accentColor: cfg.embedColor,
-  });
-
+  const avatarUrl = message.author.displayAvatarURL({ size: 256, extension: "png" });
   const customMsg = cfg.welcomeMessage
     ? cfg.welcomeMessage
         .replace("{user}", `${message.author}`)
         .replace("{count}", String(message.guild!.memberCount))
     : `Hey ${message.author}, welcome to **${message.guild!.name}**! 🎉\nUse \`!help\` to see available commands.`;
 
-  const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
   const embed = new EmbedBuilder()
     .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
     .setDescription(`${customMsg}\n\n*This is a test preview.*`)
-    .setThumbnail(message.author.displayAvatarURL({ size: 256, extension: "png" }))
-    .setImage("attachment://welcome.png")
+    .setThumbnail(avatarUrl)
     .setFooter({ text: `${message.guild!.name} • ${new Date().toLocaleDateString()}` });
 
-  await channel.send({ embeds: [embed], files: [attachment] });
+  let files: AttachmentBuilder[] = [];
+
+  if (isGifUrl(cfg.backgroundUrl)) {
+    embed.setImage(cfg.backgroundUrl!);
+  } else {
+    const card = await generateWelcomeCard({
+      username: message.author.username,
+      avatarUrl,
+      memberCount: message.guild!.memberCount,
+      backgroundUrl: cfg.backgroundUrl,
+      accentColor: cfg.embedColor,
+    });
+    const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
+    files = [attachment];
+    embed.setImage("attachment://welcome.png");
+  }
+
+  await channel.send({ embeds: [embed], files });
 }
 
 // ── Setup panel ──────────────────────────────────────────────────────────────
