@@ -50,17 +50,21 @@ export function createBot(): Client {
       const card = await generateWelcomeCard({
         username: member.user.username,
         avatarUrl: member.user.displayAvatarURL({ size: 256, extension: "png" }),
-        serverName: member.guild.name,
         memberCount: member.guild.memberCount,
         backgroundUrl: cfg.backgroundUrl,
-        customMessage: cfg.welcomeMessage,
         accentColor: cfg.embedColor,
       });
+
+      const customMsg = cfg.welcomeMessage
+        ? cfg.welcomeMessage
+            .replace("{user}", `${member}`)
+            .replace("{count}", String(member.guild.memberCount))
+        : `Hey ${member}, welcome to **${member.guild.name}**! 🎉\nUse \`!help\` to see available commands.`;
 
       const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
       const embed = new EmbedBuilder()
         .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
-        .setDescription(`Hey ${member}, welcome to **${member.guild.name}**! 🎉\nUse \`!help\` to see available commands.`)
+        .setDescription(customMsg)
         .setImage("attachment://welcome.png")
         .setFooter({ text: `${member.guild.name} • ${new Date().toLocaleDateString()}` });
 
@@ -131,17 +135,21 @@ async function handleTestWelcome(message: Message) {
   const card = await generateWelcomeCard({
     username: message.author.username,
     avatarUrl: message.author.displayAvatarURL({ size: 256, extension: "png" }),
-    serverName: message.guild!.name,
     memberCount: message.guild!.memberCount,
     backgroundUrl: cfg.backgroundUrl,
-    customMessage: cfg.welcomeMessage,
     accentColor: cfg.embedColor,
   });
+
+  const customMsg = cfg.welcomeMessage
+    ? cfg.welcomeMessage
+        .replace("{user}", `${message.author}`)
+        .replace("{count}", String(message.guild!.memberCount))
+    : `Hey ${message.author}, welcome to **${message.guild!.name}**! 🎉\nUse \`!help\` to see available commands.`;
 
   const attachment = new AttachmentBuilder(card, { name: "welcome.png" });
   const embed = new EmbedBuilder()
     .setColor((cfg.embedColor as `#${string}`) ?? "#5865F2")
-    .setDescription(`Hey ${message.author}, welcome to **${message.guild!.name}**! 🎉\nUse \`!help\` to see available commands.\n\n*This is a test preview.*`)
+    .setDescription(`${customMsg}\n\n*This is a test preview.*`)
     .setImage("attachment://welcome.png")
     .setFooter({ text: `${message.guild!.name} • ${new Date().toLocaleDateString()}` });
 

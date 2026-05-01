@@ -17,10 +17,8 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 export interface WelcomeCardOptions {
   username: string;
   avatarUrl: string;
-  serverName: string;
   memberCount: number;
   backgroundUrl?: string;
-  customMessage?: string;
   accentColor?: string;
 }
 
@@ -92,36 +90,25 @@ export async function generateWelcomeCard(opts: WelcomeCardOptions): Promise<Buf
   // ── Text ─────────────────────────────────────────────────────────────────────
   const textX = 190;
 
-  // Server name / title
-  ctx.font = "bold 38px Arial, sans-serif";
-  ctx.fillStyle = "#ffffff";
-  ctx.shadowColor = "rgba(0,0,0,0.8)";
-  ctx.shadowBlur = 6;
-  ctx.fillText(opts.serverName.toUpperCase(), textX, HEIGHT / 2 - 40);
-
-  // WELCOME label
-  ctx.font = "bold 52px Arial, sans-serif";
+  // WELCOME label — centered vertically since server name is removed
+  ctx.font = "bold 64px Arial, sans-serif";
   ctx.fillStyle = accent;
   ctx.shadowColor = "rgba(0,0,0,0.9)";
-  ctx.shadowBlur = 10;
-  ctx.fillText("WELCOME", textX, HEIGHT / 2 + 15);
+  ctx.shadowBlur = 12;
+  ctx.fillText("WELCOME", textX, HEIGHT / 2 + 10);
 
-  // Custom message or member count
-  const subText = opts.customMessage
-    ? opts.customMessage.replace("{user}", opts.username).replace("{count}", String(opts.memberCount))
-    : `YOU ARE MEMBER #${opts.memberCount}`;
-
+  // Member count below WELCOME
   ctx.font = "bold 20px Arial, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillStyle = "rgba(255,255,255,0.80)";
   ctx.shadowColor = "rgba(0,0,0,0.8)";
   ctx.shadowBlur = 4;
-  ctx.fillText(subText.toUpperCase(), textX, HEIGHT / 2 + 55);
+  ctx.fillText(`YOU ARE MEMBER #${opts.memberCount}`, textX, HEIGHT / 2 + 50);
 
-  // Username at the bottom
-  ctx.font = "18px Arial, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  // Username at the bottom-left
+  ctx.font = "16px Arial, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.shadowBlur = 0;
-  ctx.fillText(`@${opts.username}`, textX, HEIGHT - 28);
+  ctx.fillText(`@${opts.username}`, textX, HEIGHT - 22);
 
   return canvas.toBuffer("image/png");
 }
