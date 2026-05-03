@@ -1,5 +1,6 @@
 import {
   Client,
+  ActivityType,
   GatewayIntentBits,
   Partials,
   EmbedBuilder,
@@ -45,6 +46,10 @@ export function createBot(): Client {
 
   client.once("ready", () => {
     logger.info({ tag: client.user?.tag }, "Discord bot is online");
+    client.user?.setPresence({
+      activities: [{ name: "Hokage Server", type: ActivityType.Watching }],
+      status: "online",
+    });
   });
 
   // ── Welcome new members ──────────────────────────────────────────────────────
